@@ -1,0 +1,139 @@
+---
+title: "IslandCompleteRMD"
+author: "Larny Lopez"
+date: "5/31/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Randomly Assign Treatment
+```{r}
+getwd()
+
+# Each person was required to randomly sample from their given location
+# Information to identify the samples were recorded
+islandSample <- read.csv("IslandSample.csv", header=TRUE)
+head(islandSample)
+
+library(dplyr)
+
+set.seed(101)
+
+# Split Age into young and old based on the median
+# Potentially use this grouping for blocking
+old <- islandSample[islandSample$Age >= 37,]
+young <- islandSample[islandSample$Age < 37,]
+
+# 3 different treatments
+treatment <- rep(c("1", "a", "b", "ab", "c", "ac", "bc", "abc"), 2)                      
+
+# Subset Sampler, Person Sampled, and Age
+sampler_young <- cbind(young[,c(1,4,6)], sample(treatment))
+sampler_old <- cbind(old[,c(1,4,6)], sample(treatment))
+
+# assign objects to new names
+block1 <- sampler_young 
+block2 <- sampler_old 
+head(block1); head(block2)
+
+# write.csv(block1,"Island Block1.csv")
+# write.csv(block2, "Island Block2.csv")
+```  
+
+## Order the Island Sample in terms of Treatment
+```{r}
+# After data entry in googe docs
+Island <- read.csv("IslandSampleWithTreatment.csv", header = TRUE, stringsAsFactors = FALSE)
+
+
+# changing lettering to arrange in alphabetical order for neatness in the final dataset
+Island[Island$Treatment=="ab", 7] <- "ba"
+Island[Island$Treatment=="ac", 7] <- "ca"
+Island[Island$Treatment=="bc", 7] <- "cb"
+Island[Island$Treatment=="abc", 7] <- "cba"
+
+
+# arrange each block (based on age group) and arrange the order by treatment
+library(dplyr)
+FBlock1 <- Island %>% filter(Block == 1) %>% arrange(Treatment)
+FBlock2 <- Island %>%  filter(Block == 2) %>%  arrange(Treatment)
+
+head(FBlock1); head(FBlock2)
+
+# Combine the separate blocks
+FinalIsland <- rbind(FBlock1, FBlock2)
+
+FinalIsland[FinalIsland$Treatment=="ba", 7] <- "ab"
+FinalIsland[FinalIsland$Treatment=="ca", 7] <- "ac"
+FinalIsland[FinalIsland$Treatment=="cb", 7] <- "bc"
+FinalIsland[FinalIsland$Treatment=="cba", 7] <- "abc"
+
+FinalIsland
+
+# Write the Final Island data set for ease of access for multiple users
+#write.csv(FinalIsland, "FinalIsland.csv")
+```  
+
+## Test the Factorial design
+```{r}
+#Download the FinalIsland file and make sure it is in the same workspace
+FinalIsland <- read.csv("FinalIsland.csv", header = TRUE)
+
+
+# Difference between the initial score and the post treatment score
+ResponseDifference <- FinalIsland$MemoryGameDifference
+
+# numeric matrix of the treatments that will be used for modeling
+Vodka <- rep(rep(c(rep(-1, 4), rep(1, 4)), 4), 2)
+Chocolate <- rep(rep(c(rep(-1, 8), rep(1, 8)), 2), 2)
+Jog <- rep(c(rep(-1,16), rep(1, 16)), 2)
+Block <-c(rep(1, 32 ), rep(2, 32))
+
+Treatment <- FinalIsland$Treatment
+Person <- FinalIsland$PersonSampled
+
+#check the factorial design
+data.frame(Person, Treatment, Vodka, Chocolate, Jog, Block, ResponseDifference) 
+
+# Linear regression model
+IslandModel <- lm(ResponseDifference ~ Block + Vodka * Chocolate * Jog)
+anova(IslandModel)
+plot(IslandModel$fitted.values, IslandModel$residuals)
+qqnorm(IslandModel$residuals); qqline(IslandModel$residuals)
+
+#check for influential points
+p <- 3 #number of predictors
+n <- 64
+hats <- hatvalues(IslandModel)
+std_residuals <- rstandard(IslandModel)
+
+leverages <- which(hats > (2 * ((p + 1)/n) ) )
+outliers <- which(abs(std_residuals) > 2)
+bad_leverages <- which(abs(std_residuals) > 2 & hats > (2 * ((p + 1)/n) ) )
+bad_leverages
+
+#Investigate Bad Leverages
+FinalIsland[bad_leverages,]
+
+#Block only model
+IslandModelBlock <- lm(ResponseDifference ~ Block)
+anova(IslandModelBlock)
+plot(IslandModelBlock$fitted.values, IslandModelBlock$residuals)
+qqnorm(IslandModelBlock$residuals); qqline(IslandModelBlock$residuals)
+
+
+#Main effects
+library(gplots)
+par(mfrow=c(1,3))
+plotmeans(ResponseDifference ~ Vodka)
+plotmeans(ResponseDifference ~ Chocolate)
+plotmeans(ResponseDifference ~ Jog)
+
+# Check for interactions
+library(alr3)
+library(phia)
+plot(interactionMeans(aov(ResponseDifference ~ factor(Vodka) + factor(Chocolate) + factor(Jog))))
+```

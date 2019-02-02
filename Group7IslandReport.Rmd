@@ -1,0 +1,179 @@
+---
+title: "Island Project"
+subtitle: "Group 7"
+author:
+- Valerie Huang, Go Ito, Chan Kim, Justin Kim,
+- Justina Kim, Larny Lopez, Julia Ma, Hyeonkyeong Yae
+output: pdf_document
+fig_width: 4
+fig_height: 4
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#Introduction  
+  College is stressful part our lives and as a result many students turn towards different activities like partying, binge eating, and exercising to relieve these stresses. In addition, a large part of classes require students to memorize a lot of material like mathematical formulas, chemical structures, and more. We wanted to understand how these activities interacted with memory retention so we designed the experiment of how drinking alcohol, eating chocolate, and exercising would affect memory. We were interested in population of The Islands. Chocolate was chosen for food as some us heard that eating dark chocolate was good for improving memory. Using the entire population in our experiment would be too time-consuming, so we made a representative sample of the population by using the cluster sampling method to randomly select sixteen villages from the three islands, and then randomly sampling 4 people from each village using the R program. 
+  
+  We expected that drinking alcohol would be detrimental to memory retention, that chocolate would be either neutral or beneficial for memory retention, and exercising would be beneficial for memory retention. Scientific literature on these effects have also supported our intuition. The first step of the project was to get a representative sample of The Islands population through cluster sampling. Through this sample we obtained, we planned to block the nuisance factor, age. Each member of the block would be randomly assigned to a treatment combination (drink 150 mL of Vodka, eat 40% or 90% Cocoa, and jog 200 meters uphill). In addition, we used the memory game to measure the construct, memory retention. We would test for a difference between the participants' initial and final time for the memory game. Based on these results, we would use the ANOVA test, check the main effects and interactions plots, and the summary of the linear models (with and without blocking) to see whether these factors and interactions had significant effects on memory retention. 
+
+#Design of the experiment  
+```{r fig.align="center", fig.width=8, fig.height=10,echo=FALSE}
+library(png)
+library(grid)
+#img <- readPNG("YEE.PNG")
+#grid.raster(img)
+```
+ 
+![Table of the sample](BlockingViz.png)
+ 
+  We chose to use a $2^3$ factorial design with a blocking because this design allowed us to properly account for the three factors of interest and possible interactions between them. The three factors are vodka, dark chocolate and jogging, which we suspect may have effects on memory improvement based on previous studies. The low and high factor levels for vodka are respectively, no consumption (-) and 150mL (5 shots) of the drink (+). 
+  
+  We utilized a completely randomized design and randomly assigned our treatments. Before and after randomly applying the treatments, we conducted the memory game for each individual and recorded the results. We waited 20 minutes after the treatments were applied to conduct the second memory game to ensure that our treatments would have full effect. We determined this time length by observing participants' blood alcohol levels rise; on average, 20 minutes was a time length by which blood alcohol levels rose to a level considered legally impaired (0.08%). 
+  
+  To investigate on the relationship between chocolate and memory game performance, and whether different percentage of cocoa affect the result, we let each participant eat 50g of dark chocolate, half of which contain 40% of cocoa (-) while the other half contain 90% (+). Relevant scholarly articles and previous experiments also suggest high correlation between exercise and cognition. Thus, half of the participants got no exercise (-) and the rest were assigned treatments of uphill jogging for 200m (+).
+  
+  Since we believed that age might influence the memory game results but we were not interested in its effects, we decided to treat it as a nuisance factor and blocked the data based on the median age of 37.
+We chose to randomly sample 16 villages among all islands and sample 4 people from each village for a total sample size of 64 people. According to our power calculations, a sample size of about 38 resulted in a power of 0.9. Thus, utilizing 64 people was the closest way to obtain an ideal power of 0.8. 
+
+#Results and interpretation  
+```{r, echo=FALSE}
+#Download the FinalIsland file and sure it is in the same workspace
+FinalIsland <- read.csv("FinalIsland.csv", header = TRUE)
+
+ResponseDifference <- FinalIsland$MemoryGameDifference
+
+Vodka <- rep(rep(c(rep(-1, 4), rep(1, 4)), 4), 2)
+Chocolate <- rep(rep(c(rep(-1, 8), rep(1, 8)), 2), 2)
+Jog <- rep(c(rep(-1,16), rep(1, 16)), 2)
+Block <-c(rep(1, 32 ), rep(2, 32))
+
+Treatment <- FinalIsland$Treatment
+Person <- FinalIsland$PersonSampled
+
+#check the factorial design
+#data.frame(Person, Treatment, Vodka, Chocolate, Jog, Block, ResponseDifference) 
+
+IslandModel <- lm(ResponseDifference ~ Block + Vodka * Chocolate * Jog)
+```
+
+## Main Effects
+
+```{r echo=FALSE}
+# main effects
+2 * coef(IslandModel)[-1]
+```
+
+The main effects B and C, and the interaction AC have relatively large effects; however, they are not too large and possibly not significant. We need to conduct ANOVA test to see the actual significance of each effects.
+
+## ANOVA
+
+```{r, echo=FALSE}
+anova(IslandModel)
+```  
+
+Since n>=2, we can simply conduct ANOVA test. As a result, no main effects nor interactions are significant at significance level p=0.1. However, blocking was significant at the level 0.1, which means the age has significant effect on memory test game results.
+
+
+```{r, echo= FALSE}
+#check for influential points
+p <- 3 #number of predictors
+n <- 64
+hats <- hatvalues(IslandModel)
+std_residuals <- rstandard(IslandModel)
+
+leverages <- which(hats > (2 * ((p + 1)/n) ) )
+outliers <- which(abs(std_residuals) > 2)
+bad_leverages <- which(abs(std_residuals) > 2 & hats > (2 * ((p + 1)/n) ) )
+```
+
+```{r, echo=FALSE}
+#Investigate Bad Leverages
+#FinalIsland[bad_leverages,]
+#Block only model
+IslandModelBlock <- lm(ResponseDifference ~ Block)
+anova(IslandModelBlock)
+```
+
+```{r,echo=FALSE}
+ par(mfrow=c(2,2))
+#plot(IslandModelBlock$fitted.values, IslandModelBlock$residuals, xlab="Fitted Values", ylab="Residuals", main="Residuals vs. Fitted Values Plot")
+# qqnorm(IslandModelBlock$residuals); qqline(IslandModelBlock$residuals)
+#plot(IslandModel)
+```
+
+According to the results above, there are 4 observations that require more investigations.
+
+## Power ANOVA Test
+
+```{r, echo=FALSE}
+# Power Anova Test
+f <- 9/sqrt(236.27)
+# install.packages("pwr")
+library(pwr)
+## Warning: package 'pwr' was built under R version 3.4.4
+pwr.anova.test(k=8, f=f, sig.level = 0.05, power=0.9)
+```
+
+Power ANOVA test suggests that the number of replicates has to be 8. In this case, the sample size is 8 and it is sufficient.
+
+## Model Adequacy
+
+```{r, echo=FALSE,  fig.height = 3, fig.width = 7}
+# Model Adequacy
+par(mfrow=c(1,2))
+plot(IslandModel$fitted.values, IslandModel$residuals, xlab="Fitted Values", ylab="Residuals", main="Residuals vs. Fitted Values Plot")
+qqnorm(IslandModel$residuals); qqline(IslandModel$residuals)
+```
+
+According to the residual vs. fitted value plots, there is no discernible pattern and points are scattered around 0, which means that the assumption of constant variance is held. According to the normality QQ plot, although the two tails of the plots are little off, the majority of the points are still on the qqline, and it can still be concluded that the assumption of normality is met.
+```{r echo=FALSE}
+#Main effects
+# library(gplots)
+# par(mfrow=c(1,3))
+# plotmeans(ResponseDifference ~ Vodka)
+# plotmeans(ResponseDifference ~ Chocolate)
+# plotmeans(ResponseDifference ~ Jog)
+```
+
+
+```{r, echo=FALSE, include=FALSE}
+library(alr3)
+library(phia)
+```
+
+## Main/Interactin Plots
+
+```{r, echo=FALSE, fig.align="center", fig.height = 4, fig.width = 7}
+plot(interactionMeans(aov(ResponseDifference ~ factor(Vodka) + factor(Chocolate) + factor(Jog))))
+```
+
+As expected, all of the plots show parallel lines. It can be confirmed that there is no significant interaction between factors. However, main effects are not quite horizontal although ANOVA test result showed that those factors are not significant. it is probably due to the little interations we have in the model (which is very unlikely), or there is a potential nuisance factor that is not included in the model. 
+
+## Conclusion
+None of the factors for the test are significant. Exercise(200m Jog Uphill), the consumption of alcohol(Vodka), and comsumption of chocolate with different portion of cacao do not have significant effects on memory retention.
+
+
+#Discussion  
+
+The experiment aimed to investigate whether the three factors, Chocolate, Physical Exercise(20 minute jogging uphill), and Alcohol(Vodka) have any correlative effect on an individual's cognitive skill in memory. The memory construct was quantified using the length of time to complete the memory game option. We hypothesized that the factors do have a significant impact on an individual's mind.  However, even after several adjustments to our simulations and tests, our results spoke otherwise. After using a significance level of 0.1, our P-values from the ANOVA table still indicated that there was no significant effect. 
+
+Our results from the experiment contradict the real world situation. For the effect of alcohol on memory, several researches have shown that alcohol does indeed have a negative impact on behavior and brain function, especially on hippocampal function. Furthermore, the impact of alcohol on the formation of new long-term explicit memories was measured to be far stronger than the impact of drugs on the ability to recalling established memories or remembering new information in memory (White and Scott). In addition, the researches done on the impact of exercise on memory have claimed that "there is evidence suggesting moderate to strong association between physical activity, cognition and human brain function"(Sanna). Also, it was mentioned that individuals who are aerobically fit showed better performance in a variety of tasks such as learning, the cognitive function using memory(Sanna). Moreover, another research discusses that there is growing evidence that acute administration of cocoa improved cognitive function, and working memory function was improved between 90 and 150 minutes after consumption of cocoa(Andrew and Lauren). These real-life pieces of evidence showed that our result contradicts real life situation.
+Like with all successful experiments and studies, limitations and drawbacks exist. After a thorough examination of the types of flaws we encountered, we found a few we would like to address, one of them being a possible confounding variable, time. Although we used random sampling to prevent any biases, sampling all the participants around the same time was an oversight. While this is not relative to human error, one thing we would like to point out is the accuracy of the island program. Most times, online simulations do not necessarily provide precise measurements of the study consistently.  The result we got back might not have been accurate depicting realistic effects. We need to consider a possibility that even the slightest fluctuation of a second could have turned the tables around for our results concerning significance. 
+
+\pagebreak
+
+#Works Cited
+*White A.M., Scott Swartzwelder H. (2005) Age-Related Effects of Alcohol on Memory and Memory-Related Brain Function in Adolescents and Adults*
+
+*Sanna Stroth, Katrin Hille, Manfred Spitzer, Ralf Reinhardt. (2009) Aerobic endurance exercise benefits memory and affect in young adults*
+
+*Andrew Scholey, Lauren Owen,. (2013) Effects of chocolate on cognitive function and mood:a systematic review*
+
+#Appendix  
+## Bad Leverages
+```{r, echo = FALSE}
+FinalIsland[bad_leverages,]
+```
+
+
